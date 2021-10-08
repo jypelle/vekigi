@@ -1,0 +1,38 @@
+snooze_duration: 600
+webradio_groups:
+  1:
+    - name: France info
+      url: http://direct.franceinfo.fr/live/franceinfo-hifi.aac
+    - name: France bleu nord
+      url: http://direct.francebleu.fr/live/fbnord-midfi.mp3
+  2:
+    - name: Métropolys
+      url: http://str0.creacast.com/metropolys
+    - name: FIP Jazz
+      url: http://icecast.radiofrance.fr/fipjazz-hifi.aac
+  3:
+    - name: BBC Radio 1
+      url: http://stream.live.vc.bbcmedia.co.uk/bbc_radio_one
+    - name: BBC Radio 2
+      url: http://stream.live.vc.bbcmedia.co.uk/bbc_radio_two
+  4:
+    - name: Contact FM
+      url: http://broadcast.infomaniak.ch/radio-contact-high
+  5:
+    - name: Radio Cafe
+      url: http://radio.mv.ru:8080/Radio_Cafe
+  6:
+    - name: Lofi
+      url: https://stream.laut.fm/lofi
+#mifasol:
+#  hostname: localhost
+#  port: 6620
+#  ssl: true
+#  self_signed: true
+#  username: mifasol
+#  password: mifasol
+#  timeout: 600
+api:
+  enabled: true
+  ssl_port: 6650
+  api_key: timesup
