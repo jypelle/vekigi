@@ -108,11 +108,12 @@ type ServerStateConfig struct {
 }
 
 type Alarm struct {
-	Hour       int64                `yaml:"hour"`
-	Minute     int64                `yaml:"minute"`
-	WebradioId *apimodel.WebradioId `yaml:"webradio_id"`
-	PlaylistId *apimodel.PlaylistId `yaml:"playlist_id"`
-	Enabled    bool                 `yaml:"enabled"`
+	Hour              int64                `yaml:"hour"`
+	Minute            int64                `yaml:"minute"`
+	WebradioId        *apimodel.WebradioId `yaml:"webradio_id"`
+	PlaylistId        *apimodel.PlaylistId `yaml:"playlist_id"`
+	Enabled           bool                 `yaml:"enabled"`
+	NoAlarmOnWeekends bool                 `yaml:"no_alarm_on_weekends"`
 }
 
 func (sc *Alarm) AddMinute(minutes int64) {

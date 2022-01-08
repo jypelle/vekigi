@@ -57,6 +57,7 @@ func (d *Clock) Start() {
 				// Check Alarm
 				alarmTime := d.serverConfig.Alarm()
 				if alarmTime.Enabled &&
+					!(alarmTime.NoAlarmOnWeekends && (now.Weekday() == time.Saturday || now.Weekday() == time.Sunday)) &&
 					int64(now.Hour()) == alarmTime.Hour &&
 					int64(now.Minute()) == alarmTime.Minute &&
 					(int64(oldTimerTickEventTime.Hour()) != alarmTime.Hour || int64(oldTimerTickEventTime.Minute()) != alarmTime.Minute) {
