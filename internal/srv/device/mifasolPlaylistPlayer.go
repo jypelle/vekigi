@@ -35,7 +35,7 @@ func NewMifasolPlaylistPlayer(mifasolParam *config.MifasolParam) PlaylistPlayer 
 	}
 
 	var err error
-	playlistPlayer.mifasolClient, err = restClientV1.NewRestClient(mifasolParam)
+	playlistPlayer.mifasolClient, err = restClientV1.NewRestClient(mifasolParam, false)
 	if err != nil {
 		logrus.Warningf("Failed to create mifasol client: %v", err)
 	}
