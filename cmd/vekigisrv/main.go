@@ -3,14 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/jypelle/vekigi/internal/srv"
-	"github.com/jypelle/vekigi/internal/version"
-	"github.com/sirupsen/logrus"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/jypelle/vekigi/internal/srv"
+	"github.com/jypelle/vekigi/internal/version"
+	"github.com/lmittmann/tint"
 )
 
 const configSuffix = "vekigi"
@@ -18,7 +20,7 @@ const configSuffix = "vekigi"
 func main() {
 
 	// Logger
-	logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true})
+	slog.SetDefault(newLogger(slog.LevelInfo, "2006-01-02T15:04:05"))
 
 	mainCommand := filepath.Base(os.Args[0])
 
@@ -26,9 +28,6 @@ func main() {
 
 	// Debug Mode
 	debugMode := flag.Bool("d", false, "Enable debug mode")
-
-	// Simulation Mode
-	simulationMode := flag.Bool("s", false, "Enable simulation mode")
 
 	// User config dir
 	defaultConfigDir := "./." + configSuffix
@@ -100,29 +99,39 @@ func main() {
 	// endregion
 
 	if *debugMode {
-		logrus.SetLevel(logrus.DebugLevel)
-		logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true, FullTimestamp: true, TimestampFormat: time.RFC3339Nano})
-		logrus.Printf("Debug mode activated")
+		slog.SetDefault(newLogger(slog.LevelDebug, time.RFC3339Nano))
+		slog.Info("Debug mode activated")
 	}
 
 	// Create vekigi server
-	serverApp := srv.NewServerApp(*configDir, *debugMode, *simulationMode)
+	serverApp := srv.NewServerApp(*configDir, *debugMode)
 
 	if versionCmd.Parsed() {
 		fmt.Printf("Version %s\n", version.AppVersion.String())
 	} else {
 		if runCmd.Parsed() {
 			// Listen stop signal
-			ch := make(chan os.Signal)
+			ch := make(chan os.Signal, 1)
 			signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGABRT, syscall.SIGHUP, syscall.SIGUSR1)
 
-			// Start pensees server
+			// Start vekigi server
 			serverApp.Start()
 
-			sig := <-ch
-			logrus.Infof("Received signal: %v", sig)
+			sig := serverApp.WaitForStop(ch)
+			if sig != nil {
+				slog.Info("Received signal", "signal", sig)
+			}
 			serverApp.Stop(sig == syscall.SIGUSR1)
 		}
 	}
 
+}
+
+func newLogger(level slog.Level, timeFormat string) *slog.Logger {
+	return slog.New(
+		tint.NewTextHandler(os.Stdout, &tint.Options{
+			Level:      level,
+			TimeFormat: timeFormat,
+		}),
+	)
 }

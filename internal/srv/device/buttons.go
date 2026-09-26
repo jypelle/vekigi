@@ -1,41 +1,43 @@
 package device
 
 import (
-	"github.com/jypelle/vekigi/internal/srv/event"
-	"github.com/sirupsen/logrus"
 	"log"
+	"log/slog"
+	"sync"
+	"time"
+
+	"github.com/jypelle/vekigi/internal/srv/event"
+	"github.com/jypelle/vekigi/internal/tool"
 	"periph.io/x/conn/v3/gpio"
 	"periph.io/x/conn/v3/gpio/gpioreg"
 	"periph.io/x/host/v3"
-	"sync"
-	"time"
 )
 
 type Button struct {
 	buttonId       event.ButtonId
-	pin            gpio.PinIO
+	readPressed    func() bool
 	isPressed      bool
 	pressStepCount int64
 	lastChange     time.Time
 }
 
 func NewButton(buttonId event.ButtonId, name string) *Button {
-	button := Button{buttonId: buttonId, pin: gpioreg.ByName(name)}
+	pin := gpioreg.ByName(name)
 
-	if button.pin == nil {
-		logrus.Fatalf("Failed to find %s button", name)
+	if pin == nil {
+		tool.Fatal("Failed to find button", "button", name)
 	}
 
 	// Set it as input, with an internal pull up resistor:
-	if err := button.pin.In(gpio.PullUp, gpio.NoEdge); err != nil {
-		logrus.Fatalf("Failed to setup %s button: %v", name, err)
+	if err := pin.In(gpio.PullUp, gpio.NoEdge); err != nil {
+		tool.Fatal("Failed to setup button", "button", name, "error", err)
 	}
-	return &button
+	return &Button{buttonId: buttonId, readPressed: func() bool { return bool(!pin.Read()) }}
 }
 
 func (b *Button) Refresh(buttonEventChannel chan event.ButtonEvent) {
 	wasPressed := b.isPressed
-	b.isPressed = bool(!b.pin.Read())
+	b.isPressed = b.readPressed()
 
 	now := time.Now()
 	if !b.isPressed && wasPressed {
@@ -63,8 +65,10 @@ type Buttons struct {
 }
 
 func NewButtons(simulation bool) *Buttons {
-	if _, err := host.Init(); err != nil {
-		log.Fatal(err)
+	if !simulation {
+		if _, err := host.Init(); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	device := Buttons{
@@ -78,12 +82,14 @@ func NewButtons(simulation bool) *Buttons {
 }
 
 func (d *Buttons) Start() {
-	logrus.Infof("Start buttons device")
+	slog.Info("Start buttons device")
 
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
-	if !d.simulation {
+	if d.simulation {
+		d.buttons = simulatorButtons()
+	} else {
 		d.buttons = append(d.buttons, NewButton(event.DIGIT1_BUTTON, "GPIO16"))
 		d.buttons = append(d.buttons, NewButton(event.DIGIT2_BUTTON, "GPIO13"))
 		d.buttons = append(d.buttons, NewButton(event.DIGIT3_BUTTON, "GPIO12"))
@@ -116,7 +122,7 @@ func (d *Buttons) Start() {
 }
 
 func (d *Buttons) StopSendingEvent() {
-	logrus.Infof("Stop buttons device")
+	slog.Info("Stop buttons device")
 
 	d.lock.Lock()
 	defer d.lock.Unlock()

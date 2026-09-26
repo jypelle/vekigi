@@ -1,11 +1,13 @@
 package device
 
 import (
-	"github.com/jypelle/vekigi/internal/srv/config"
-	"github.com/sirupsen/logrus"
+	"fmt"
+	"log/slog"
 	"os/exec"
 	"strconv"
 	"sync"
+
+	"github.com/jypelle/vekigi/internal/srv/config"
 )
 
 type Audio struct {
@@ -20,7 +22,7 @@ func NewAudio(serverState *config.ServerState) *Audio {
 }
 
 func (w *Audio) Start() {
-	logrus.Infof("Start audio device")
+	slog.Info("Start audio device")
 
 	w.lock.Lock()
 	defer w.lock.Unlock()
@@ -28,21 +30,20 @@ func (w *Audio) Start() {
 	w.zeroSoundCmd = exec.Command("aplay", "-D", "default", "-t", "raw", "-r", "44100", "-c", "2", "-f", "S16_LE", "/dev/zero")
 	err := w.zeroSoundCmd.Start()
 	if err != nil {
-		logrus.Panic("Unable to activate popping/clicking cleaner: %v", err)
-		return
+		panic(fmt.Errorf("unable to activate popping/clicking cleaner: %w", err))
 	}
 
 	w.applyVolume()
 }
 
 func (w *Audio) Stop() {
-	logrus.Infof("Stop audio device")
+	slog.Info("Stop audio device")
 
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
 	if err := w.zeroSoundCmd.Process.Kill(); err != nil {
-		logrus.Errorf("Failed to stop popping/clicking cleaner: %v", err)
+		slog.Error("Failed to stop popping/clicking cleaner", "error", err)
 	}
 }
 
@@ -61,27 +62,27 @@ func (w *Audio) applyVolume() {
 	cmd := exec.Command("amixer", "set", "PCM", strconv.FormatInt(int64(w.serverState.Volume()), 10)+"%")
 	err := cmd.Run()
 	if err != nil {
-		logrus.Warnf("Unable to set volume")
+		slog.Warn("Unable to set volume", "error", err)
 		return
 	}
 }
 
 func (w *Audio) IncreaseVolume() {
-	logrus.Infof("Increase volume")
+	slog.Info("Increase volume")
 	w.lock.Lock()
 	defer w.lock.Unlock()
 	w.setVolume(w.serverState.Volume() + 4)
 }
 
 func (w *Audio) DecreaseVolume() {
-	logrus.Infof("Decrease volume")
+	slog.Info("Decrease volume")
 	w.lock.Lock()
 	defer w.lock.Unlock()
 	w.setVolume(w.serverState.Volume() - 4)
 }
 
 func (w *Audio) SetVolume(volume int64) error {
-	logrus.Infof("Set volume")
+	slog.Info("Set volume")
 	w.lock.Lock()
 	defer w.lock.Unlock()
 	w.setVolume(volume)

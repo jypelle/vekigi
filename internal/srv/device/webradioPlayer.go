@@ -2,12 +2,13 @@ package device
 
 import (
 	"fmt"
+	"log/slog"
+	"os/exec"
+	"sync"
+
 	"github.com/jypelle/vekigi/apimodel"
 	"github.com/jypelle/vekigi/internal/srv/config"
 	"github.com/jypelle/vekigi/internal/srv/event"
-	"github.com/sirupsen/logrus"
-	"os/exec"
-	"sync"
 )
 
 type WebradioPlayer struct {
@@ -32,11 +33,11 @@ func NewWebradioPlayer(config *config.ServerConfig) *WebradioPlayer {
 }
 
 func (d *WebradioPlayer) Start() {
-	logrus.Infof("Start webradio player device")
+	slog.Info("Start webradio player device")
 }
 
 func (d *WebradioPlayer) StopSendingEvent() {
-	logrus.Infof("Stop sending events for webradio player device")
+	slog.Info("Stop sending events for webradio player device")
 
 	d.lock.Lock()
 	defer d.lock.Unlock()
@@ -46,7 +47,7 @@ func (d *WebradioPlayer) StopSendingEvent() {
 }
 
 func (d *WebradioPlayer) Stop() {
-	logrus.Infof("Stop webradio player device")
+	slog.Info("Stop webradio player device")
 
 	d.lock.Lock()
 	defer d.lock.Unlock()
@@ -63,7 +64,7 @@ func (d *WebradioPlayer) Play(radioId apimodel.WebradioId) error {
 	defer d.lock.Unlock()
 
 	if d.currentRadioId != nil && radioId == *d.currentRadioId {
-		logrus.Infof("Already listening radio %d", radioId)
+		slog.Info("Already listening radio", "radioId", radioId)
 		return nil
 	}
 
@@ -81,7 +82,7 @@ func (d *WebradioPlayer) Play(radioId apimodel.WebradioId) error {
 	}
 	d.clear()
 
-	logrus.Infof("Listening Radio %d: \"%s\" ", radioId, webradio.Name)
+	slog.Info("Listening radio", "radioId", radioId, "name", webradio.Name)
 	d.currentRadioCmd = exec.Command("cvlc", "--aout=alsa", "--play-and-exit", webradio.Url)
 	err := d.currentRadioCmd.Start()
 	if err != nil {
@@ -151,7 +152,7 @@ func (d *WebradioPlayer) Clear() {
 func (d *WebradioPlayer) clear() {
 	if d.currentRadioCmd != nil {
 		if err := d.currentRadioCmd.Process.Kill(); err != nil {
-			logrus.Errorf("Failed to kill process: %v", err)
+			slog.Error("Failed to kill process", "error", err)
 		}
 		d.currentRadioCmd = nil
 		d.currentRadioId = nil

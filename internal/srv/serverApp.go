@@ -1,16 +1,18 @@
 package srv
 
 import (
+	"fmt"
+	"log/slog"
+	"math/rand"
+	"os"
+	"os/exec"
+	"time"
+
 	"github.com/gorilla/mux"
 	"github.com/jypelle/vekigi/internal/srv/config"
 	"github.com/jypelle/vekigi/internal/srv/device"
 	"github.com/jypelle/vekigi/internal/srv/event"
 	"github.com/jypelle/vekigi/internal/version"
-	"github.com/sirupsen/logrus"
-	"math/rand"
-	"os"
-	"os/exec"
-	"time"
 )
 
 type ServerApp struct {
@@ -56,16 +58,16 @@ const (
 	SNOOZE_OFF_POPUP
 )
 
-func NewServerApp(configDir string, debugMode bool, simulationMode bool) *ServerApp {
+func NewServerApp(configDir string, debugMode bool) *ServerApp {
 
-	logrus.Debugf("Creation of vekigi server %s ...", version.AppVersion.String())
+	slog.Debug("Creation of vekigi server ...", "version", version.AppVersion.String())
 
 	app := &ServerApp{
 		currentMode:          UNDEFINED_MODE,
 		internalEventChannel: make(chan event.InternalEvent),
 		eventLoopAskDone:     make(chan bool),
 		eventLoopDone:        make(chan bool),
-		ServerConfig:         config.NewServerConfig(configDir, debugMode, simulationMode),
+		ServerConfig:         config.NewServerConfig(configDir, debugMode),
 	}
 
 	app.displayDevice = device.NewDisplay(app.SimulationMode)
@@ -80,18 +82,18 @@ func NewServerApp(configDir string, debugMode bool, simulationMode bool) *Server
 	app.buttonsDevice = device.NewButtons(app.SimulationMode)
 	app.apiDevice = device.NewApi(app.ServerConfig)
 
-	logrus.Debugln("Server created")
+	slog.Debug("Server created")
 
 	return app
 }
 
 func (s *ServerApp) Start() {
-	logrus.Printf("Starting vekigi server ...")
+	slog.Info("Starting vekigi server ...")
 
 	// Init random generator
 	rand.Seed(time.Now().UnixNano())
 
-	logrus.Printf("Starting devices ...")
+	slog.Info("Starting devices ...")
 
 	// Start display device
 	s.displayDevice.Start()
@@ -127,8 +129,14 @@ func (s *ServerApp) Start() {
 
 }
 
+// WaitForStop blocks until a stop signal is received. When built with -tags simulator, the simulator window runs
+// meanwhile on the calling goroutine (which must be the main one) and closing it also returns (with a nil signal)
+func (s *ServerApp) WaitForStop(signals <-chan os.Signal) os.Signal {
+	return device.WaitForStop(s.displayDevice, signals)
+}
+
 func (s *ServerApp) Stop(halt bool) {
-	logrus.Printf("Stopping vekigi server ...")
+	slog.Info("Stopping vekigi server ...")
 
 	// Stop api
 	s.apiDevice.StopSendingEvent()
@@ -146,7 +154,7 @@ func (s *ServerApp) Stop(halt bool) {
 	s.webradioPlayerDevice.StopSendingEvent()
 
 	// Stop event loop
-	logrus.Infof("Stop event loop")
+	slog.Info("Stop event loop")
 	s.eventLoopAskDone <- true
 	<-s.eventLoopDone
 
@@ -169,14 +177,14 @@ func (s *ServerApp) Stop(halt bool) {
 	// Flush config backup
 	s.ServerConfig.ServerState.FlushSave()
 
-	logrus.Printf("Server stopped")
+	slog.Info("Server stopped")
 
 	if halt {
-		logrus.Printf("System halt")
+		slog.Info("System halt")
 		haltCmd := exec.Command("sudo", "halt")
 		err := haltCmd.Run()
 		if err != nil {
-			logrus.Panicf("Unable to halt the system: %v", err)
+			panic(fmt.Errorf("unable to halt the system: %w", err))
 		}
 	}
 	os.Exit(0)

@@ -1,0 +1,19 @@
+version: '3'
+
+tasks:
+  build:
+    cmds:
+      - rm -Rf ./release
+      # Raspberry Pi Zero WH is ARMv6: GOARM must be explicit since Go now defaults to 7 when cross-compiling
+      - CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 go build -ldflags "-s" -o release/linux-arm/vekigisrv ./cmd/vekigisrv
+
+  deploy:
+    deps: [build]
+    cmds:
+      - ssh pi@vekigi "sudo systemctl stop vekigisrv"
+      - scp -p ./release/linux-arm/vekigisrv pi@vekigi:/home/pi/vekigisrv
+      - ssh pi@vekigi "sudo systemctl start vekigisrv"
+
+  simulator:
+    cmds:
+      - go run -tags simulator ./cmd/vekigisrv -d run

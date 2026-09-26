@@ -16,7 +16,7 @@ func (m *Version) String() string {
 var (
 	AppVersion = Version{
 		MajorNumber: 1,
-		MinorNumber: 0,
+		MinorNumber: 1,
 		PatchNumber: 0,
 	}
 )

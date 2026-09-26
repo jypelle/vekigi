@@ -3,9 +3,11 @@ package images
 import (
 	"bytes"
 	_ "embed"
-	"github.com/sirupsen/logrus"
+	"fmt"
 	"image"
 	_ "image/png"
+
+	"github.com/jypelle/vekigi/internal/tool"
 )
 
 //go:embed intro.png
@@ -34,22 +36,22 @@ func init() {
 
 	IntroImage, _, err = image.Decode(bytes.NewReader(IntroImgFile))
 	if err != nil {
-		logrus.Panicf("Can't load intro image: %v", err)
+		panic(fmt.Errorf("can't load intro image: %w", err))
 	}
 
 	AlarmImage, _, err = image.Decode(bytes.NewReader(AlarmImgFile))
 	if err != nil {
-		logrus.Fatalf("Can't load alarm image: %v", err)
+		tool.Fatal("Can't load alarm image", "error", err)
 	}
 
 	SnoozeImage, _, err = image.Decode(bytes.NewReader(SnoozeImgFile))
 	if err != nil {
-		logrus.Fatalf("Can't load snooze image: %v", err)
+		tool.Fatal("Can't load snooze image", "error", err)
 	}
 
 	NumbersImage, _, err = image.Decode(bytes.NewReader(NumbersImgFile))
 	if err != nil {
-		logrus.Fatalf("Can't load numbers image: %v", err)
+		tool.Fatal("Can't load numbers image", "error", err)
 	}
 
 }

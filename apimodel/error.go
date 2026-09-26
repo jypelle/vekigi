@@ -2,7 +2,7 @@ package apimodel
 
 import (
 	"encoding/json"
-	"github.com/sirupsen/logrus"
+	"fmt"
 	"net/http"
 	"strconv"
 )
@@ -48,11 +48,11 @@ func (v ErrorMessage) SendError(w http.ResponseWriter) {
 	w.WriteHeader(v.ErrStatusCode)
 	err := json.NewEncoder(w).Encode(v)
 	if err != nil {
-		logrus.Panicf("error when encoding error: %v", err)
+		panic(fmt.Errorf("error when encoding error: %w", err))
 	}
 }
 
-//errors message
+// errors message
 var WrongParametersErrorMessage = ErrorMessage{
 	ErrStatusCode: http.StatusBadRequest,
 	ErrMessage:    "unable to parse parameters",

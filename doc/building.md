@@ -97,12 +97,15 @@ And voilà !
 
 #### Pi zero W
 
-- Download and launch [Raspberry Pi Imager](https://www.raspberrypi.org/software)
-- Select *Raspberry Pi OS Lite (32-bit)* image
-- Install image to the microSD Card 
-- On the sd card `boot` partition:
-  - [create](https://www.raspberrypi.org/documentation/configuration/wireless/headless.md) `wpa_supplicant.conf` with your wifi crendentials
-  - create a blank file named `ssh`
+- Download and launch [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
+- Select the *Raspberry Pi Zero* device and the *Raspberry Pi OS Lite (32-bit)* image
+- Customise the OS settings when asked:
+  - Hostname: `vekigi` (or `vekigi2` to avoid conflicts with another vekigi)
+  - Username: `pi`, with the password of your choice
+  - Your wifi credentials
+  - Your time zone
+  - Enable SSH
+- Install image to the microSD Card
 - Insert the sd card into the Pi, and start it
 - Wait 5 minutes
 - Use your router to find Pi's IP address.
@@ -110,13 +113,10 @@ And voilà !
   ```
   XX.XX.XX.XX vekigi
   ```
-- Connect to the PI through SSH: `ssh pi@vekigi` with password `raspberry`
-- Set new Pi's password
+- Connect to the PI through SSH: `ssh pi@vekigi`
 - Execute `sudo apt update` && `sudo apt upgrade`
 - Execute `sudo raspi-config`
-  - Replace `raspberrypi` hostname with `vekigi` (or `vekigi2` to avoid conflicts with another vekigi)
-  - Set your Timezone
-  - Enable I2C
+  - Enable I2C (in *Interface Options*)
 - Execute `sudo nano /etc/asound.conf` to enable speakers:
 
 ```
@@ -159,7 +159,7 @@ pcm.!default {
 }
 ```
 
-- Execute `sudo nano /boot/config.txt`:
+- Execute `sudo nano /boot/firmware/config.txt` (`/boot/config.txt` on releases older than Bookworm):
 
 ```
 #dtparam=audio=on
@@ -171,15 +171,15 @@ dtoverlay=i2s-mmap
 
 - Reconnect to the PI through SSH: `ssh pi@vekigi`
 
-#### VLC
+#### VLC and ALSA utils
 
 ```bash
-sudo apt install vlc
+sudo apt install vlc alsa-utils
 ```
 
-#### Vekigi server binary
+#### Vekigi server
 
-#### Add service to auto start and stop vekigi server
+##### Add service to auto start and stop vekigi server
 
 - Create systemd service file
 
@@ -205,7 +205,7 @@ sudo apt install vlc
     WantedBy=multi-user.target
     ```
 
-- Enable & start vekigi server
+- Enable vekigi server
 
     ```
     sudo systemctl daemon-reload
@@ -216,12 +216,13 @@ sudo apt install vlc
 
 ###### From source
 
-- Execute `make install` from a computer connected to the same lan
+- Install [Go 1.27+](https://go.dev/dl/) and [Task](https://taskfile.dev) on a computer connected to the same lan
+- Execute `task deploy` from the Vekigi source folder: it builds the server binary, copies it to `pi@vekigi` and starts the service
 - Wait a few minutes to see the time displayed on your *Vekigi*
 
 ###### From prebuilt binary
 
-- Copy `vekigisrv` binary to `/home/pi/vekigisrv`
+- Copy the `vekigisrv` binary built for Linux ARMv6 (`task build` puts it in `release/linux-arm/vekigisrv`) to `/home/pi/vekigisrv`
 - Execute `chmod a+x /home/pi/vekigisrv`
 - Start vekigi server with `sudo systemctl start vekigisrv.service`
 - Wait a few minutes to see the time displayed on your *Vekigi*

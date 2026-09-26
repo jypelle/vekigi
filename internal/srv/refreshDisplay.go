@@ -1,13 +1,14 @@
 package srv
 
 import (
-	"github.com/jypelle/vekigi/internal/images"
-	"github.com/jypelle/vekigi/internal/srv/event"
-	"github.com/sirupsen/logrus"
 	"image"
 	"image/color"
 	"image/draw"
+	"log/slog"
 	"time"
+
+	"github.com/jypelle/vekigi/internal/images"
+	"github.com/jypelle/vekigi/internal/srv/event"
 )
 
 func (s *ServerApp) refreshDisplay(resetMode bool) {
@@ -63,7 +64,7 @@ func (s *ServerApp) refreshDisplay(resetMode bool) {
 }
 
 func (s *ServerApp) refreshClockDisplay() image.Image {
-	logrus.Debugf("Display clock")
+	slog.Debug("Display clock")
 	currentWebradio := s.webradioPlayerDevice.CurrentWebRadio()
 	currentPlaylist := s.playlistPlayerDevice.CurrentPlaylist()
 	now := time.Now()
@@ -117,7 +118,7 @@ func (s *ServerApp) refreshClockDisplay() image.Image {
 }
 
 func (s *ServerApp) refreshAlarmSettingsDisplay() image.Image {
-	logrus.Debugf("Display alarm settings")
+	slog.Debug("Display alarm settings")
 
 	img := image.NewRGBA(image.Rect(0, 0, 128, 64))
 	draw.Draw(img, img.Bounds(), &image.Uniform{color.RGBA{0, 0, 0, 255}}, image.ZP, draw.Src)

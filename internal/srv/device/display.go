@@ -1,18 +1,39 @@
 package device
 
 import (
-	"github.com/sirupsen/logrus"
 	"image"
 	_ "image/png"
 	"log"
+	"log/slog"
+	"sync"
+
+	"github.com/jypelle/vekigi/internal/tool"
+	"periph.io/x/conn/v3/i2c"
 	"periph.io/x/conn/v3/i2c/i2creg"
 	"periph.io/x/devices/v3/ssd1306"
 	"periph.io/x/host/v3"
 )
 
+type Display struct {
+	oledLock    sync.Mutex
+	oledDisplay *ssd1306.Dev
+	i2cBus      i2c.BusCloser
+
+	lock           sync.RWMutex
+	on             bool
+	simulationMode bool
+	lastImg        image.Image
+
+	askDone chan bool
+	askImg  chan image.Image
+	done    chan bool
+}
+
 func NewDisplay(simulationMode bool) *Display {
-	if _, err := host.Init(); err != nil {
-		log.Fatal(err)
+	if !simulationMode {
+		if _, err := host.Init(); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	device := Display{
@@ -26,24 +47,23 @@ func NewDisplay(simulationMode bool) *Display {
 }
 
 func (d *Display) Start() {
-	logrus.Infof("Start display device")
+	slog.Info("Start display device")
 
 	d.on = true
 
-	if d.simulationMode {
-		d.startSimulation()
-	} else {
+	// In simulation mode, the simulator window reads the current image by itself
+	if !d.simulationMode {
 		var err error
 		// Open a handle to the first available I²C bus:
 		d.i2cBus, err = i2creg.Open("")
 		if err != nil {
-			logrus.Fatalf("Unable to open i2c bus: %v\n", err)
+			tool.Fatal("Unable to open i2c bus", "error", err)
 		}
 
 		// Open a handle to a ssd1306 connected on the I²C bus:
 		d.oledDisplay, err = ssd1306.NewI2C(d.i2cBus, &ssd1306.DefaultOpts)
 		if err != nil {
-			logrus.Fatalf("Unable to initialize oled display: %v\n", err)
+			tool.Fatal("Unable to initialize oled display", "error", err)
 		}
 
 		d.oledDisplay.SetContrast(1)
@@ -68,11 +88,9 @@ func (d *Display) Start() {
 }
 
 func (d *Display) Stop() {
-	logrus.Infof("Stop display device")
+	slog.Info("Stop display device")
 
-	if d.simulationMode {
-		d.closeSimulationWindow()
-	} else {
+	if !d.simulationMode {
 		d.askDone <- true
 		<-d.done
 	}
@@ -102,9 +120,7 @@ func (d *Display) SetOn() {
 
 func (d *Display) setOn() {
 	d.on = true
-	if d.simulationMode {
-		d.invalidateSimulationWindow()
-	} else {
+	if !d.simulationMode {
 		d.oledLock.Lock()
 		d.oledDisplay.SetContrast(1) // Hack to force display on (calling Draw() is not enough)
 		d.oledLock.Unlock()
@@ -136,11 +152,17 @@ func (d *Display) ShowImage(img image.Image) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.lastImg = img
-	if d.on {
-		if d.simulationMode {
-			d.invalidateSimulationWindow()
-		} else {
-			d.askImg <- img
-		}
+	if d.on && !d.simulationMode {
+		d.askImg <- img
 	}
+}
+
+// image returns the image currently visible on the display, nil when the display is off
+func (d *Display) image() image.Image {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+	if !d.on {
+		return nil
+	}
+	return d.lastImg
 }

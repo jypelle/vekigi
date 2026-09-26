@@ -1,12 +1,13 @@
 package srv
 
 import (
+	"log/slog"
+	"syscall"
+	"time"
+
 	"github.com/jypelle/vekigi/internal/srv/config"
 	"github.com/jypelle/vekigi/internal/srv/device"
 	"github.com/jypelle/vekigi/internal/srv/event"
-	"github.com/sirupsen/logrus"
-	"syscall"
-	"time"
 )
 
 func (s *ServerApp) eventLoop() {
@@ -27,24 +28,24 @@ func (s *ServerApp) eventLoop() {
 		case ev := <-s.clockDevice.EventChannel():
 			switch ev.Data.(type) {
 			case event.TickerEventTickData:
-				logrus.Debugf("Receive Ticker tick event")
+				slog.Debug("Receive Ticker tick event")
 				if s.currentMode == CLOCK_MODE && s.currentPopUp == NO_POPUP {
 					s.refreshDisplay(false)
 				}
 			case event.TickerEventAlarmData:
-				logrus.Infof("Receive Ticker alarm event")
+				slog.Info("Receive Ticker alarm event")
 				alarmTime := s.Alarm()
 				if alarmTime.WebradioId != nil {
 					s.playlistPlayerDevice.Clear()
 					err := s.webradioPlayerDevice.Play(*alarmTime.WebradioId)
 					if err != nil {
-						logrus.Warn(err)
+						slog.Warn("Unable to play", "error", err)
 					}
 				} else if alarmTime.PlaylistId != nil {
 					s.webradioPlayerDevice.Clear()
 					err := s.playlistPlayerDevice.Play(*alarmTime.PlaylistId)
 					if err != nil {
-						logrus.Warn(err)
+						slog.Warn("Unable to play", "error", err)
 					}
 				}
 				s.refreshDisplay(true)
@@ -70,17 +71,17 @@ func (s *ServerApp) eventLoop() {
 		case ev := <-s.webradioPlayerDevice.EventChannel():
 			switch ev.Data.(type) {
 			case event.WebradioEventStopPlayingData:
-				logrus.Debugf("Receive webradioStopPlaying event")
+				slog.Debug("Receive webradioStopPlaying event")
 				s.refreshDisplay(true)
 			}
 		case ev := <-s.playlistPlayerDevice.EventChannel():
 			switch ev.Data.(type) {
 			case event.PlaylistEventPlayingSongData:
-				logrus.Infof("Receive playlistPlayingSong event")
+				slog.Info("Receive playlistPlayingSong event")
 				s.refreshDisplay(true)
 			}
 		case ev := <-s.buttonsDevice.EventChannel():
-			logrus.Debugf("Receive button event: %d, %d, %d", ev.ButtonId, ev.ButtonEventType, ev.PressStepCount)
+			slog.Debug("Receive button event", "buttonId", ev.ButtonId, "eventType", ev.ButtonEventType, "pressStepCount", ev.PressStepCount)
 			switch ev.ButtonId {
 			case event.DIGIT1_BUTTON:
 				fallthrough
@@ -94,7 +95,7 @@ func (s *ServerApp) eventLoop() {
 				fallthrough
 			case event.DIGIT6_BUTTON:
 				if ev.ButtonEventType == event.PRESS_EVENT_TYPE {
-					logrus.Debugf("Receive button digit press event")
+					slog.Debug("Receive button digit press event")
 					if (ev.PressStepCount-1)%3 == 0 {
 						groupId := int64(ev.ButtonId) + 1
 						webradioList, ok := s.WebradioGroups[groupId]
@@ -111,7 +112,7 @@ func (s *ServerApp) eventLoop() {
 								s.playlistPlayerDevice.Clear()
 								err := s.webradioPlayerDevice.Play(nextWebradio.WebradioId)
 								if err != nil {
-									logrus.Warn(err)
+									slog.Warn("Unable to play", "error", err)
 								}
 							} else if s.currentMode == ALARM_SETTING_MODE {
 								alarmTime := s.Alarm()
@@ -131,7 +132,7 @@ func (s *ServerApp) eventLoop() {
 				}
 			case event.PLAYLIST_BUTTON:
 				if ev.ButtonEventType == event.PRESS_EVENT_TYPE {
-					logrus.Debugf("Receive button playlist press event")
+					slog.Debug("Receive button playlist press event")
 					if (ev.PressStepCount-1)%3 == 0 {
 						if s.currentMode == CLOCK_MODE {
 							currentPlaylist := s.playlistPlayerDevice.CurrentPlaylist()
@@ -147,7 +148,7 @@ func (s *ServerApp) eventLoop() {
 								s.webradioPlayerDevice.Clear()
 								err := s.playlistPlayerDevice.Play(nextPlaylist.PlaylistId)
 								if err != nil {
-									logrus.Warn(err)
+									slog.Warn("Unable to play", "error", err)
 								}
 							}
 						} else if s.currentMode == ALARM_SETTING_MODE {
@@ -171,7 +172,7 @@ func (s *ServerApp) eventLoop() {
 				}
 			case event.ALARM_SETTING_BUTTON:
 				if ev.ButtonEventType == event.RELEASE_EVENT_TYPE && ev.PressStepCount < 6 {
-					logrus.Debugf("Switch alarm setting mode")
+					slog.Debug("Switch alarm setting mode")
 					if s.currentMode == CLOCK_MODE {
 						s.currentMode = ALARM_SETTING_MODE
 					} else if s.currentMode == ALARM_SETTING_MODE {
@@ -180,7 +181,7 @@ func (s *ServerApp) eventLoop() {
 					s.refreshDisplay(true)
 				} else if ev.ButtonEventType == event.PRESS_EVENT_TYPE && ev.PressStepCount == 6 {
 					if s.currentMode == CLOCK_MODE {
-						logrus.Debugf("Switch alarm enabled state")
+						slog.Debug("Switch alarm enabled state")
 						alarmTime := s.Alarm()
 						alarmTime.Enabled = !alarmTime.Enabled
 						s.SetAlarm(alarmTime)
@@ -189,7 +190,7 @@ func (s *ServerApp) eventLoop() {
 				}
 			case event.LESS_BUTTON:
 				if ev.ButtonEventType == event.PRESS_EVENT_TYPE {
-					logrus.Debugf("Receive button less event")
+					slog.Debug("Receive button less event")
 					if s.currentMode == CLOCK_MODE {
 						if s.popUpHideTimer != nil {
 							s.popUpHideTimer.Stop()
@@ -215,7 +216,7 @@ func (s *ServerApp) eventLoop() {
 				}
 			case event.MORE_BUTTON:
 				if ev.ButtonEventType == event.PRESS_EVENT_TYPE {
-					logrus.Debugf("Receive button more event")
+					slog.Debug("Receive button more event")
 					if s.currentMode == CLOCK_MODE {
 						if s.popUpHideTimer != nil {
 							s.popUpHideTimer.Stop()
@@ -241,18 +242,18 @@ func (s *ServerApp) eventLoop() {
 				}
 			case event.SNOOZE_BUTTON:
 				if ev.ButtonEventType == event.RELEASE_EVENT_TYPE && ev.PressStepCount < 5 {
-					logrus.Debugf("Switch display on/off")
+					slog.Debug("Switch display on/off")
 					s.displayDevice.Switch()
 				} else if ev.ButtonEventType == event.PRESS_EVENT_TYPE {
 					if ev.PressStepCount == 5 {
-						logrus.Debugf("Stop playing sound")
+						slog.Debug("Stop playing sound")
 						s.clockDevice.Snooze()
 						s.webradioPlayerDevice.Clear()
 						s.playlistPlayerDevice.Clear()
 						s.refreshDisplay(true)
 					} else if ev.PressStepCount == 15 {
 						if s.clockDevice.IsAlarmRunning() {
-							logrus.Debugf("Snooze off")
+							slog.Debug("Snooze off")
 							s.currentPopUp = SNOOZE_OFF_POPUP
 							s.popUpHideTimer = time.AfterFunc(1200*time.Millisecond, func() {
 								s.internalEventChannel <- event.InternalEvent{Data: event.InternalEventPopupHideData{}}
@@ -265,12 +266,12 @@ func (s *ServerApp) eventLoop() {
 			case event.NEXT_POWEROFF_BUTTON:
 				if ev.ButtonEventType == event.RELEASE_EVENT_TYPE && ev.PressStepCount < 20 {
 					if s.playlistPlayerDevice.CurrentPlaylist() != nil {
-						logrus.Debugf("Next song in playlist")
+						slog.Debug("Next song in playlist")
 						s.playlistPlayerDevice.NextSong()
 						s.refreshDisplay(true)
 					}
 				} else if ev.ButtonEventType == event.PRESS_EVENT_TYPE && ev.PressStepCount == 20 {
-					logrus.Debugf("See you!")
+					slog.Debug("See you!")
 					s.clockDevice.ClearAlarm()
 					syscall.Kill(syscall.Getpid(), syscall.SIGUSR1)
 

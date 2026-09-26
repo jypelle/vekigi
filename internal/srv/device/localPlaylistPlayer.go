@@ -2,14 +2,15 @@ package device
 
 import (
 	"fmt"
-	"github.com/jypelle/vekigi/apimodel"
-	"github.com/jypelle/vekigi/internal/srv/event"
-	"github.com/sirupsen/logrus"
+	"log/slog"
 	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sync"
+
+	"github.com/jypelle/vekigi/apimodel"
+	"github.com/jypelle/vekigi/internal/srv/event"
 )
 
 type LocalPlaylistPlayer struct {
@@ -36,11 +37,11 @@ func NewLocalPlaylistPlayer(playlistFolder string) PlaylistPlayer {
 }
 
 func (d *LocalPlaylistPlayer) Start() {
-	logrus.Infof("Start local playlist player device")
+	slog.Info("Start local playlist player device")
 }
 
 func (d *LocalPlaylistPlayer) StopSendingEvent() {
-	logrus.Infof("Stop sending events for local playlist player device")
+	slog.Info("Stop sending events for local playlist player device")
 
 	d.lock.Lock()
 	defer d.lock.Unlock()
@@ -50,7 +51,7 @@ func (d *LocalPlaylistPlayer) StopSendingEvent() {
 }
 
 func (d *LocalPlaylistPlayer) Stop() {
-	logrus.Infof("Stop local playlist player device")
+	slog.Info("Stop local playlist player device")
 
 	d.lock.Lock()
 	defer d.lock.Unlock()
@@ -65,7 +66,7 @@ func (d *LocalPlaylistPlayer) EventChannel() chan event.PlaylistEvent {
 func (d *LocalPlaylistPlayer) PlaylistCount() int64 {
 	files, err := os.ReadDir(d.playlistFolder)
 	if err != nil {
-		logrus.Warningf("Unable to access local playlist folder: %v", err)
+		slog.Warn("Unable to access local playlist folder", "error", err)
 		return 0
 	}
 	len := int64(0)
@@ -86,12 +87,12 @@ func (d *LocalPlaylistPlayer) GetPlaylist(playlistId apimodel.PlaylistId) *Playl
 
 func (d *LocalPlaylistPlayer) getPlaylist(playlistId apimodel.PlaylistId) *Playlist {
 	if playlistId < 1 {
-		logrus.Warnf("Playlist %d is undefined", playlistId)
+		slog.Warn("Playlist is undefined", "playlistId", playlistId)
 		return nil
 	}
 	files, err := os.ReadDir(d.playlistFolder)
 	if err != nil {
-		logrus.Warningf("Unable to access local playlist folder: %v", err)
+		slog.Warn("Unable to access local playlist folder", "error", err)
 		return nil
 	}
 	currPlaylistId := apimodel.PlaylistId(0)
@@ -107,7 +108,7 @@ func (d *LocalPlaylistPlayer) getPlaylist(playlistId apimodel.PlaylistId) *Playl
 		}
 	}
 
-	logrus.Warnf("Playlist %d is undefined", playlistId)
+	slog.Warn("Playlist is undefined", "playlistId", playlistId)
 	return nil
 
 }
@@ -117,7 +118,7 @@ func (d *LocalPlaylistPlayer) Play(playlistId apimodel.PlaylistId) error {
 	defer d.lock.Unlock()
 
 	if d.currentPlaylist != nil && playlistId == d.currentPlaylist.PlaylistId {
-		logrus.Infof("Already listening playlist %d", playlistId)
+		slog.Info("Already listening playlist", "playlistId", playlistId)
 		return nil
 	}
 	playlist := d.getPlaylist(playlistId)
@@ -145,7 +146,7 @@ func (d *LocalPlaylistPlayer) Play(playlistId apimodel.PlaylistId) error {
 
 	d.currentPlaylist = playlist
 	d.currentPlaylistSongFiles = playlistSongFiles
-	logrus.Infof("Listening Playlist %d: \"%s\" ", playlistId, playlist.Name)
+	slog.Info("Listening playlist", "playlistId", playlistId, "name", playlist.Name)
 
 	d.playSong()
 
@@ -155,7 +156,7 @@ func (d *LocalPlaylistPlayer) Play(playlistId apimodel.PlaylistId) error {
 func (d *LocalPlaylistPlayer) playSong() {
 	if d.currentPlaylistCmd != nil {
 		if err := d.currentPlaylistCmd.Process.Kill(); err != nil {
-			logrus.Errorf("Failed to kill process: %v", err)
+			slog.Error("Failed to kill process", "error", err)
 		}
 	}
 	d.currentPlaylistCmd = nil
@@ -171,7 +172,7 @@ func (d *LocalPlaylistPlayer) playSong() {
 	d.currentPlaylistCmd = exec.Command("cvlc", "--aout=alsa", "--play-and-exit", filepath.Join(d.playlistFolder, d.currentPlaylist.Name, d.currentPlaylistSongFiles[d.currentPlaylistPosition]))
 	err := d.currentPlaylistCmd.Start()
 	if err != nil {
-		logrus.Warnf("Unable to listen song %d on playlist %s", d.currentPlaylistPosition, d.currentPlaylist.Name)
+		slog.Warn("Unable to listen song on playlist", "position", d.currentPlaylistPosition, "playlist", d.currentPlaylist.Name, "error", err)
 		d.clear()
 		return
 	}
@@ -221,7 +222,7 @@ func (d *LocalPlaylistPlayer) clear() {
 	if d.currentPlaylist != nil {
 		if d.currentPlaylistCmd != nil {
 			if err := d.currentPlaylistCmd.Process.Kill(); err != nil {
-				logrus.Errorf("Failed to kill process: %v", err)
+				slog.Error("Failed to kill process", "error", err)
 			}
 		}
 		d.currentPlaylistCmd = nil

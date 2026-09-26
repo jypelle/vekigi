@@ -1,13 +1,14 @@
 package srv
 
 import (
-	"github.com/hajimehoshi/bitmapfont/v2"
+	"image"
+	"image/color"
+
+	"github.com/hajimehoshi/bitmapfont/v3"
 	"github.com/jypelle/vekigi/internal/images"
 	"golang.org/x/image/draw"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
-	"image"
-	"image/color"
 )
 
 var col = color.RGBA{255, 255, 255, 255}
@@ -15,7 +16,7 @@ var uniformImage = image.NewUniform(col)
 
 func AddLabel(img *image.RGBA, x, y int, label string) {
 
-	point := fixed.Point26_6{fixed.Int26_6((x + 4) * 64), fixed.Int26_6(y * 64)}
+	point := fixed.Point26_6{X: fixed.Int26_6((x + 4) * 64), Y: fixed.Int26_6(y * 64)}
 
 	d := &font.Drawer{
 		Dst: img,

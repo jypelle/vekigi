@@ -1,12 +1,15 @@
 package config
 
 import (
-	"github.com/jypelle/vekigi/apimodel"
-	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
+	"fmt"
 	"io/ioutil"
+	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/jypelle/vekigi/apimodel"
+	"github.com/jypelle/vekigi/internal/tool"
+	"gopkg.in/yaml.v3"
 )
 
 type ServerState struct {
@@ -26,11 +29,11 @@ func NewsServerState(completeStateFilename string) *ServerState {
 		// Interpret state file
 		err = yaml.Unmarshal(rawConfig, &serverState.serverStateConfig)
 		if err != nil {
-			logrus.Fatalf("Unable to interpret config file: %v\n", err)
+			tool.Fatal("Unable to interpret config file", "error", err)
 		}
 	} else {
 		// Create default state file
-		logrus.Infof("Create default state file")
+		slog.Info("Create default state file")
 		serverState.SetVolume(40)
 		serverState.SetAlarm(Alarm{Hour: 8, Minute: 0})
 	}
@@ -81,14 +84,14 @@ func (ss *ServerState) scheduleSave() {
 }
 
 func (ss *ServerState) save() {
-	logrus.Infof("Save state file: %s", ss.completeStateFilename)
+	slog.Info("Save state file", "file", ss.completeStateFilename)
 	rawConfig, err := yaml.Marshal(&ss.serverStateConfig)
 	if err != nil {
-		logrus.Fatalf("Unable to serialize state file: %v\n", err)
+		tool.Fatal("Unable to serialize state file", "error", err)
 	}
 	err = ioutil.WriteFile(ss.completeStateFilename, rawConfig, 0660)
 	if err != nil {
-		logrus.Fatalf("Unable to save state file: %v\n", err)
+		tool.Fatal("Unable to save state file", "error", err)
 	}
 }
 
@@ -130,5 +133,5 @@ func (sc *Alarm) AddMinute(minutes int64) {
 	} else if sc.Hour < 0 {
 		sc.Hour = sc.Hour%24 + 24
 	}
-	logrus.Debugf("New alarm value: %02d:%02d", sc.Hour, sc.Minute)
+	slog.Debug("New alarm value", "time", fmt.Sprintf("%02d:%02d", sc.Hour, sc.Minute))
 }

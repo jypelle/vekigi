@@ -1,11 +1,12 @@
 package device
 
 import (
-	"github.com/jypelle/vekigi/internal/srv/config"
-	"github.com/jypelle/vekigi/internal/srv/event"
-	"github.com/sirupsen/logrus"
+	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/jypelle/vekigi/internal/srv/config"
+	"github.com/jypelle/vekigi/internal/srv/event"
 )
 
 type Clock struct {
@@ -32,7 +33,7 @@ func NewClock(serverConfig *config.ServerConfig) *Clock {
 }
 
 func (d *Clock) Start() {
-	logrus.Infof("Start ticker device")
+	slog.Info("Start ticker device")
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -75,7 +76,7 @@ func (d *Clock) Start() {
 }
 
 func (d *Clock) StopSendingEvent() {
-	logrus.Infof("Stop ticker device")
+	slog.Info("Stop ticker device")
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -116,7 +117,7 @@ func (d *Clock) Snooze() {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	if d.snoozeWakeUpTimer != nil {
-		logrus.Infof("Snooze for %d seconds", d.serverConfig.SnoozeDuration)
+		slog.Info("Snooze", "seconds", d.serverConfig.SnoozeDuration)
 		d.snoozeWakeUpTimer.Reset(time.Duration(d.serverConfig.SnoozeDuration) * time.Second)
 	}
 }

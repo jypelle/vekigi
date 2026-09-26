@@ -4,19 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
-	"github.com/jypelle/vekigi/apimodel"
-	"github.com/jypelle/vekigi/internal/srv/config"
-	"github.com/jypelle/vekigi/internal/srv/event"
-	"github.com/jypelle/vekigi/internal/tool"
-	"github.com/sirupsen/logrus"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"runtime/debug"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
+	"github.com/jypelle/vekigi/apimodel"
+	"github.com/jypelle/vekigi/internal/srv/config"
+	"github.com/jypelle/vekigi/internal/srv/event"
+	"github.com/jypelle/vekigi/internal/tool"
 )
 
 type Api struct {
@@ -54,7 +55,7 @@ func NewApi(config *config.ServerConfig) *Api {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				defer func() {
 					if rec := recover(); rec != nil {
-						logrus.Warningf("recovered from panic : [%v] - stack trace : \n [%s]", rec, debug.Stack())
+						slog.Warn("Recovered from panic", "panic", rec, "stack", string(debug.Stack()))
 						strMessage := fmt.Sprintf("%v", rec)
 						GlobalErrorAction(w, strMessage, http.StatusInternalServerError)
 					}
@@ -67,7 +68,7 @@ func NewApi(config *config.ServerConfig) *Api {
 					return
 				}
 
-				logrus.Debugf("PATH: %s %s", r.Host, r.URL.Path)
+				slog.Debug("Request", "host", r.Host, "path", r.URL.Path)
 
 				handler.ServeHTTP(w, r)
 			})
@@ -176,20 +177,25 @@ func NewApi(config *config.ServerConfig) *Api {
 }
 
 func (d *Api) Start() {
-	logrus.Infof("Start api device")
+	if !d.config.ApiParam.Enabled {
+		slog.Info("Api device disabled")
+		return
+	}
+
+	slog.Info("Start api device")
 
 	existServerCert, err := tool.IsFileExists(d.selfSignedCertFilename())
 	if err != nil {
-		logrus.Fatalf("Unable to access %s: %v\n", d.selfSignedCertFilename(), err)
+		tool.Fatal("Unable to access cert file", "file", d.selfSignedCertFilename(), "error", err)
 	}
 
 	existServerKey, err := tool.IsFileExists(d.selfSignedKeyFilename())
 	if err != nil {
-		logrus.Fatalf("Unable to access %s: %v\n", d.selfSignedKeyFilename(), err)
+		tool.Fatal("Unable to access key file", "file", d.selfSignedKeyFilename(), "error", err)
 	}
 
 	if !existServerCert || !existServerKey {
-		logrus.Info("Missing cert and key files, trying to generate them...")
+		slog.Info("Missing cert and key files, trying to generate them...")
 		err = tool.GenerateTlsCertificate(
 			"jypelle",
 			"Vekigi Server",
@@ -197,22 +203,26 @@ func (d *Api) Start() {
 			d.selfSignedCertFilename(),
 			[]string{})
 		if err != nil {
-			logrus.Fatalf("Unable to generate cert and key files : %v\n", err)
+			tool.Fatal("Unable to generate cert and key files", "error", err)
 		}
-		logrus.Info("Self-signed cert and key files generated")
+		slog.Info("Self-signed cert and key files generated")
 	}
 
 	// Launch https server
 	go func() {
 		err := d.server.ListenAndServeTLS(d.selfSignedCertFilename(), d.selfSignedKeyFilename())
 		if err != nil && err.Error() != "http: Server closed" {
-			logrus.Error(err)
+			slog.Error("Https server failure", "error", err)
 		}
 	}()
 }
 
 func (d *Api) StopSendingEvent() {
-	logrus.Infof("Stop api device")
+	if !d.config.ApiParam.Enabled {
+		return
+	}
+
+	slog.Info("Stop api device")
 	d.server.Shutdown(context.Background())
 	//close(d.eventChannel)
 }

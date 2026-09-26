@@ -1,12 +1,14 @@
 package config
 
 import (
-	"github.com/jypelle/vekigi/apimodel"
-	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
+	"log/slog"
 	"os"
 	"path/filepath"
+
+	"github.com/jypelle/vekigi/apimodel"
+	"github.com/jypelle/vekigi/internal/tool"
+	"gopkg.in/yaml.v3"
 )
 
 const paramFilename = "param.yaml"
@@ -22,7 +24,7 @@ type ServerConfig struct {
 	*ServerState
 }
 
-func NewServerConfig(configDir string, debugMode bool, simulationMode bool) *ServerConfig {
+func NewServerConfig(configDir string, debugMode bool) *ServerConfig {
 	serverConfig := &ServerConfig{
 		ConfigDir:      configDir,
 		DebugMode:      debugMode,
@@ -33,13 +35,13 @@ func NewServerConfig(configDir string, debugMode bool, simulationMode bool) *Ser
 	_, err := os.Stat(configDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			logrus.Printf("Creation of config folder: %s", configDir)
+			slog.Info("Creation of config folder", "folder", configDir)
 			err = os.Mkdir(configDir, 0770)
 			if err != nil {
-				logrus.Fatalf("Unable to create config folder: %v\n", err)
+				tool.Fatal("Unable to create config folder", "error", err)
 			}
 		} else {
-			logrus.Fatalf("Unable to access config folder: %s", configDir)
+			tool.Fatal("Unable to access config folder", "folder", configDir)
 		}
 	}
 
@@ -50,16 +52,16 @@ func NewServerConfig(configDir string, debugMode bool, simulationMode bool) *Ser
 		serverConfig.ServerParam = &ServerParam{}
 		err = yaml.Unmarshal(rawConfig, serverConfig.ServerParam)
 		if err != nil {
-			logrus.Fatalf("Unable to interpret config file: %v\n", err)
+			tool.Fatal("Unable to interpret config file", "error", err)
 		}
 	} else {
 		// Create default param file
-		logrus.Infof("Create default param file")
+		slog.Info("Create default param file")
 		serverConfig.ServerParam = &ServerParam{}
 
 		err = yaml.Unmarshal(ParamDefaultFile, serverConfig.ServerParam)
 		if err != nil {
-			logrus.Fatalf("Unable to interpret config file: %v\n", err)
+			tool.Fatal("Unable to interpret config file", "error", err)
 		}
 
 		serverConfig.SaveParam()
@@ -97,13 +99,13 @@ func (sc *ServerConfig) GetCompletePlaylistFolder() string {
 }
 
 func (sc *ServerConfig) SaveParam() {
-	logrus.Debugf("Save param file: %s", sc.GetCompleteParamFilename())
+	slog.Debug("Save param file", "file", sc.GetCompleteParamFilename())
 	rawConfig, err := yaml.Marshal(*sc.ServerParam)
 	if err != nil {
-		logrus.Fatalf("Unable to serialize param file: %v\n", err)
+		tool.Fatal("Unable to serialize param file", "error", err)
 	}
 	err = ioutil.WriteFile(sc.GetCompleteParamFilename(), rawConfig, 0660)
 	if err != nil {
-		logrus.Fatalf("Unable to save param file: %v\n", err)
+		tool.Fatal("Unable to save param file", "error", err)
 	}
 }

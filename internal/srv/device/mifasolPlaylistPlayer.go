@@ -2,15 +2,16 @@ package device
 
 import (
 	"fmt"
+	"log/slog"
+	"math/rand"
+	"os/exec"
+	"sync"
+
 	"github.com/jypelle/mifasol/restApiV1"
 	"github.com/jypelle/mifasol/restClientV1"
 	"github.com/jypelle/vekigi/apimodel"
 	"github.com/jypelle/vekigi/internal/srv/config"
 	"github.com/jypelle/vekigi/internal/srv/event"
-	"github.com/sirupsen/logrus"
-	"math/rand"
-	"os/exec"
-	"sync"
 )
 
 type MifasolPlaylistPlayer struct {
@@ -37,25 +38,23 @@ func NewMifasolPlaylistPlayer(mifasolParam *config.MifasolParam) PlaylistPlayer 
 	var err error
 	playlistPlayer.mifasolClient, err = restClientV1.NewRestClient(mifasolParam, false)
 	if err != nil {
-		logrus.Warningf("Failed to create mifasol client: %v", err)
+		slog.Warn("Failed to create mifasol client", "error", err)
 	}
 
-	userId := playlistPlayer.mifasolClient.UserId()
-	playlistFilterOrder := restApiV1.PlaylistFilterOrderByName
 	playlistPlayer.mifasolPlaylistList, err = playlistPlayer.mifasolClient.ReadPlaylists(&restApiV1.PlaylistFilter{
-		FavoriteUserId: &userId,
-		OrderBy:        &playlistFilterOrder,
+		FavoriteUserId: new(playlistPlayer.mifasolClient.UserId()),
+		OrderBy:        new(restApiV1.PlaylistFilterOrderByName),
 	})
 
 	return &playlistPlayer
 }
 
 func (d *MifasolPlaylistPlayer) Start() {
-	logrus.Infof("Start mifasol playlist player device")
+	slog.Info("Start mifasol playlist player device")
 }
 
 func (d *MifasolPlaylistPlayer) StopSendingEvent() {
-	logrus.Infof("Stop sending events for mifasol playlist player device")
+	slog.Info("Stop sending events for mifasol playlist player device")
 
 	d.lock.Lock()
 	defer d.lock.Unlock()
@@ -65,7 +64,7 @@ func (d *MifasolPlaylistPlayer) StopSendingEvent() {
 }
 
 func (d *MifasolPlaylistPlayer) Stop() {
-	logrus.Infof("Stop playlist mifasol player device")
+	slog.Info("Stop playlist mifasol player device")
 
 	d.lock.Lock()
 	defer d.lock.Unlock()
@@ -109,7 +108,7 @@ func (d *MifasolPlaylistPlayer) getMifasolPlaylist(playlistId apimodel.PlaylistI
 		return &d.mifasolPlaylistList[playlistId-1]
 	}
 
-	logrus.Warnf("Mifasol playlist %d is undefined", playlistId)
+	slog.Warn("Mifasol playlist is undefined", "playlistId", playlistId)
 	return nil
 
 }
@@ -124,7 +123,7 @@ func (d *MifasolPlaylistPlayer) Play(playlistId apimodel.PlaylistId) error {
 	}
 
 	if d.currentPlaylistId > 0 && d.currentPlaylistId == playlistId {
-		logrus.Infof("Already listening playlist %d", playlistId)
+		slog.Info("Already listening playlist", "playlistId", playlistId)
 		return nil
 	}
 
@@ -137,7 +136,7 @@ func (d *MifasolPlaylistPlayer) Play(playlistId apimodel.PlaylistId) error {
 	d.clear()
 
 	d.currentPlaylistId = playlistId
-	logrus.Infof("Listening Playlist %d: \"%s\" ", playlistId, mifasolPlaylist.Name)
+	slog.Info("Listening playlist", "playlistId", playlistId, "name", mifasolPlaylist.Name)
 
 	d.playSong()
 
@@ -147,7 +146,7 @@ func (d *MifasolPlaylistPlayer) Play(playlistId apimodel.PlaylistId) error {
 func (d *MifasolPlaylistPlayer) playSong() {
 	if d.currentPlaylistCmd != nil {
 		if err := d.currentPlaylistCmd.Process.Kill(); err != nil {
-			logrus.Errorf("Failed to kill process: %v", err)
+			slog.Error("Failed to kill process", "error", err)
 		}
 	}
 	d.currentPlaylistCmd = nil
@@ -163,13 +162,13 @@ func (d *MifasolPlaylistPlayer) playSong() {
 
 	song, cliErr := d.mifasolClient.ReadSong(currentMifasolPlaylist.SongIds[d.currentPlaylistPosition])
 	if cliErr != nil {
-		logrus.Warnf("Unknown song %d on playlist %s", d.currentPlaylistPosition, currentMifasolPlaylist.Name)
+		slog.Warn("Unknown song on playlist", "position", d.currentPlaylistPosition, "playlist", currentMifasolPlaylist.Name, "error", cliErr)
 		d.clear()
 		return
 	}
 	songContent, _, cliErr := d.mifasolClient.ReadSongContent(currentMifasolPlaylist.SongIds[d.currentPlaylistPosition])
 	if cliErr != nil {
-		logrus.Warnf("Unable to read %d on playlist %s", d.currentPlaylistPosition, currentMifasolPlaylist.Name)
+		slog.Warn("Unable to read song on playlist", "position", d.currentPlaylistPosition, "playlist", currentMifasolPlaylist.Name, "error", cliErr)
 		d.clear()
 		return
 	}
@@ -179,7 +178,7 @@ func (d *MifasolPlaylistPlayer) playSong() {
 	d.currentPlaylistCmd.Stdin = songContent
 	err := d.currentPlaylistCmd.Start()
 	if err != nil {
-		logrus.Warnf("Unable to listen song %d on playlist %s", d.currentPlaylistPosition, currentMifasolPlaylist.Name)
+		slog.Warn("Unable to listen song on playlist", "position", d.currentPlaylistPosition, "playlist", currentMifasolPlaylist.Name, "error", err)
 		d.clear()
 		return
 	}
@@ -242,7 +241,7 @@ func (d *MifasolPlaylistPlayer) clear() {
 	if d.currentPlaylistId > 0 {
 		if d.currentPlaylistCmd != nil {
 			if err := d.currentPlaylistCmd.Process.Kill(); err != nil {
-				logrus.Errorf("Failed to kill process: %v", err)
+				slog.Error("Failed to kill process", "error", err)
 			}
 		}
 		d.currentPlaylistCmd = nil
