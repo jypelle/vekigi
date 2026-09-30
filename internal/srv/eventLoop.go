@@ -101,7 +101,7 @@ func (s *ServerApp) eventLoop() {
 						webradioList, ok := s.WebradioGroups[groupId]
 						if ok {
 							if s.currentMode == CLOCK_MODE {
-								currentWebradio := s.webradioPlayerDevice.CurrentWebRadio()
+								currentWebradio := s.webradioPlayerDevice.LastWebRadio()
 								var nextWebradio *config.Webradio
 								if currentWebradio != nil && currentWebradio.WebradioId.GroupId == groupId {
 									nextWebradio = webradioList[int(currentWebradio.WebradioId.IndexId)%len(webradioList)]

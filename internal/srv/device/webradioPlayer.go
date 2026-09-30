@@ -20,6 +20,9 @@ type WebradioPlayer struct {
 	currentRadioId  *apimodel.WebradioId
 	currentRadioCmd *exec.Cmd
 
+	// Radio whose playback ended by itself (vlc exited), used to move to the next radio
+	endedRadioId *apimodel.WebradioId
+
 	sendEvent bool
 }
 
@@ -96,6 +99,7 @@ func (d *WebradioPlayer) Play(radioId apimodel.WebradioId) error {
 		d.lock.Lock()
 		defer d.lock.Unlock()
 		if d.currentRadioCmd == currentRadioCmd {
+			d.endedRadioId = d.currentRadioId
 			d.currentRadioCmd = nil
 			d.currentRadioId = nil
 			if d.sendEvent {
@@ -116,6 +120,22 @@ func (d *WebradioPlayer) CurrentWebRadio() *config.Webradio {
 	}
 
 	return d.webradioGroups[d.currentRadioId.GroupId][d.currentRadioId.IndexId-1]
+}
+
+// LastWebRadio returns the current webradio or, if none, the last one whose playback ended by itself
+func (d *WebradioPlayer) LastWebRadio() *config.Webradio {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	radioId := d.currentRadioId
+	if radioId == nil {
+		radioId = d.endedRadioId
+	}
+	if radioId == nil {
+		return nil
+	}
+
+	return d.webradioGroups[radioId.GroupId][radioId.IndexId-1]
 }
 
 func (d *WebradioPlayer) Webradio(webradioId apimodel.WebradioId) *config.Webradio {
@@ -150,6 +170,7 @@ func (d *WebradioPlayer) Clear() {
 }
 
 func (d *WebradioPlayer) clear() {
+	d.endedRadioId = nil
 	if d.currentRadioCmd != nil {
 		if err := d.currentRadioCmd.Process.Kill(); err != nil {
 			slog.Error("Failed to kill process", "error", err)
